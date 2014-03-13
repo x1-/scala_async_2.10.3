@@ -14,15 +14,15 @@ import scala.util.{Failure, Success}
  */
 object Main extends App {
 
-  val n = 50  // 母数
-  val r = 5 // 任意の5個
+  def n = 50  // 母数
+  def r = 5 // 任意の5個
 
   override def main( args: Array[String] ): Unit = {
 
     // 1. Futureの基本的な使い方
 //    standard1
     // 2. 見通しの悪いコールバックチェイン。
-    //callback1
+//    callback1
     // 3. for内包表記によるコールバックチェイン。
 //    callback2
     // 4. 実用的な並列処理。
@@ -31,20 +31,10 @@ object Main extends App {
 
   /**
    * 1. Futureの基本的な使い方
-   *  1〜100までの数字の中から任意の5個を選ぶ。
-   *  5個の数値を足した合計が奇数か偶数か判定し、ひたすらprintする。
-   *  戻り値は偶数の数。
+   *  1〜50までの数字の中から任意の5個を選ぶ。
+   *  5個の数値を足した合計が奇数か偶数か判定する。
+   *  偶数がいくつあるかを戻り値とする。
    * ・・という処理を非同期で行います。
-   *
-  before await:283 ms
-c:1,2,3,4,5, isEven:false
-c:1,2,3,4,6, isEven:true
-   :
-c:95,97,98,99,100, isEven:false
-c:96,97,98,99,100, isEven:true
-Await.result:37643760
-even number: 37643760
-onComplete:699375 ms
    */
   def standard1: Unit = {
 
@@ -52,10 +42,7 @@ onComplete:699375 ms
 
     // Futureを返すfutureメソッドを呼び出します。
     val fs = future {
-      ( 1 to 100 ).combinations( 5 ).foldLeft( 0 )( (n, c) => {
-        //println( s"c:${c.mkString(",")}, isEven:${c.sum % 2 == 0}" )
-        if ( c.sum % 2 == 0 ) n + 1 else n
-      })
+      ( 1 to n ).combinations( r ).count( _.sum % 2 == 0 )
     }
 
     // Futureの完了。Futureは値もしくは例外を持つとき、完了したことになります。
@@ -82,26 +69,14 @@ onComplete:699375 ms
 
   /**
    * 2. 見通しの悪いコールバックチェイン。
-   *  2-1. 1〜100までの数字の中から任意の5個を選ぶ。
+   *  2-1. 1〜50までの数字の中から任意の5個を選ぶ。
    *       5個の数値を足した合計が奇数か偶数か判定し、偶数の数を数える。
-   * ↑ここまでが非同期で行う1番目のブロック
+   *   ↑ここまでが非同期で行う1番目のブロック
    *  2-2.最終的に算出された偶数の値を割り切れなくなるまで2で割り、割った回数を返却する。
-   * ↑ここまでが非同期で行う2番目のブロック
-   * ・・という処理を非同期で行います。
+   *   ↑ここまでが非同期で行う2番目のブロック
    *
-   *
-  スタンスとしては、Futureを使う時は結果を同期的に待つのではなくて、Futureトレイトのインスタンスにコールバック関数を登録して（先のサンプルでは、Future#onComplete）、非同期に結果を受け取って処理しなさい、というスタンスなようです。
-＊その方が、性能的に好ましいということだそうで
-
-とはいっても、Futureのバックグラウンドで使われているスレッドはForkJoinPoolのWorkerスレッド（Daemonスレッド）なので、普通にプログラムを実行してそれ以降の処理がないと、JavaVMが終了してしまいます…。
-   from:
-   http://d.hatena.ne.jp/Kazuhira/20130111/1357920383
-
-   というわけで下のf22は実行されませんw
-before await:71198 ms
-onSuccess:73115 ms
-f22 divided number: ()
-Await.result:570
+   * Futureのバックグラウンドで使われているスレッドはForkJoinPoolのWorkerスレッド（Daemonスレッド）なので、それ以降の処理がないとJavaVMが終了してしまいます。
+   * というわけで下のf22は実行されませんw
    */
   def callback1: Unit = {
 
@@ -110,12 +85,7 @@ Await.result:570
     // 2-1の処理を行うFuture。
     val f21 = future {
       println( s"f21 start:${System.currentTimeMillis()-stime} ms" )
-      ( 1 to 20 ).combinations( 3 ).foldLeft( 0 )( (n, c) => {
-        val isEven = c.sum % 2 == 0
-        //println( s"c:${c.mkString(",")}, isEven:${isEven}" )
-        if ( isEven ) n + 1 else n
-//        if ( c.sum % 2 == 0 ) n + 1 else n
-      })
+      ( 1 to n ).combinations( r ).count( _.sum % 2 == 0 )
     }
 
     // 2-1が失敗したら2-2の処理は行いません。
@@ -157,27 +127,10 @@ Await.result:570
 
   /**
    * 3. for内包表記によるコールバックチェイン。
-   *  3-1. 1〜100までの数字の中から任意の5個を選ぶ。
+   *  3-1. 1〜50までの数字の中から任意の5個を選ぶ。
    *       5個の数値を足した合計が奇数か偶数か判定し、偶数の数を数える。
-   * ↑ここまでが非同期で行う1番目のブロック
+   *   ↑ここまでを非同期で行う
    *  3-2.最終的に算出された偶数の値を割り切れなくなるまで2で割り、割った回数を返却する。
-   * ↑ここまでが非同期で行う2番目のブロック
-   * ・・という処理を非同期で行います。
-   *
-   *
-  スタンスとしては、Futureを使う時は結果を同期的に待つのではなくて、Futureトレイトのインスタンスにコールバック関数を登録して（先のサンプルでは、Future#onComplete）、非同期に結果を受け取って処理しなさい、というスタンスなようです。
-＊その方が、性能的に好ましいということだそうで
-
-とはいっても、Futureのバックグラウンドで使われているスレッドはForkJoinPoolのWorkerスレッド（Daemonスレッド）なので、普通にプログラムを実行してそれ以降の処理がないと、JavaVMが終了してしまいます…。
-   from:
-   http://d.hatena.ne.jp/Kazuhira/20130111/1357920383
-
-   というわけで下のf32は実行されませんw
-before await:251 ms
-f32 yield:451 ms
-f32 divided number: ()
-Await.result:()
-f32 onComplete get: ()
    */
   def callback2: Unit = {
 
@@ -186,12 +139,7 @@ f32 onComplete get: ()
     // 3-1の処理を行うFuture。
     val f31 = future {
       println( s"f31 start:${System.currentTimeMillis()-stime} ms" )
-      ( 1 to 20 ).combinations( 3 ).foldLeft( 0 )( (n, c) => {
-        val isEven = c.sum % 2 == 0
-        //println( s"c:${c.mkString(",")}, isEven:${isEven}" )
-        if ( isEven ) n + 1 else n
-        //        if ( c.sum % 2 == 0 ) n + 1 else n
-      })
+      ( 1 to n ).combinations( r ).count( _.sum % 2 == 0 )
     }
 
     val f32 = for {
@@ -231,34 +179,30 @@ f32 onComplete get: ()
    *       2,118,760通りをプロセッサ数分のスレッドで偶数判定を行う。
    *  4-3. 最終的に算出された偶数の値を割り切れなくなるまで2で割り、割った回数を返却する。
    *
-combination number:2118760
-combination generated:286 ms
-before await:324 ms
-f42 complete:15964 ms
-f42 sum:1059380
-f43 complete:15965 ms
-f43 divided number: 20
    */
   def pragmatic: Unit = {
 
     val stime = System.currentTimeMillis()
 
-    // 4-1. 1〜100までの数字の中から任意の5個を選びます。
+    // 4-1. 1〜50までの数字の中から任意の5個を選びます。
     val size = combins( n, r )
-    println( s"combination number:${size}" )
+    println( s"combination number:${size}, ${System.currentTimeMillis()-stime} ms" )
 
     // 1スレッドが処理する組数です。
     val block: Int = size / availableProcessors
 
     // 組み合せを生成します。
-    val cs = ( 1 to n ).combinations( r )
-    val s = cs.toStream
+    val cs = ( 1 to n ).combinations( r ).toIndexedSeq
     println( s"combination generated:${System.currentTimeMillis()-stime} ms" )
 
+    val newcs = for ( i <- 1 to availableProcessors ) yield {
+      //cs.drop( (i-1) * block ).take( block )
+      cs.slice( (i-1) * block, i * block )
+    }
     // 4-2. スレッドを生成します。
     val futures = for ( i <- 1 to availableProcessors )
       yield future {
-        s.slice( (i-1) * block, i * block ).count( _.sum % 2 == 0 )
+      newcs(i-1).count( _.sum % 2 == 0 )
     }
 
     println( s"before await:${System.currentTimeMillis()-stime} ms" )

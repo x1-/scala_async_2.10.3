@@ -26,7 +26,15 @@ object Main extends App {
     // 3. for内包表記によるコールバックチェイン。
 //    callback2
     // 4. 実用的な並列処理。
-    pragmatic
+//    pragmatic
+
+    // lazy valの検証
+    val laz = new Lazziness()
+    laz.method
+//Lazziness.method
+//LazzinessTrait.lazzillyPrint!
+//called,LazzinessTrait.counter!
+//counter:15
   }
 
   /**
